@@ -74,6 +74,11 @@ class AzFileCopyStrategy extends SimpleFileCopyStrategy {
         copy.remove('PATH')
         copy.put('PATH', '$PWD/.nextflow-bin:$AZ_BATCH_NODE_SHARED_DIR/bin/:$PATH')
         copy.put('AZCOPY_LOG_LOCATION', '$PWD/.azcopy_log')
+        if( !config.storage().sasToken && config.batch().poolIdentityClientId ) {
+            copy.put('AZCOPY_AUTO_LOGIN_TYPE', 'MSI')
+            if( config.batch().poolIdentityClientId != 'auto' )
+                copy.put('AZCOPY_MSI_CLIENT_ID', config.batch().poolIdentityClientId)
+        }
 
         final envSnippet = super.getEnvScript(copy,false)
         if( envSnippet )
@@ -84,6 +89,8 @@ class AzFileCopyStrategy extends SimpleFileCopyStrategy {
 
     protected String getSasForPath(Path path) {
         if( !(path instanceof AzPath) )
+            return null
+        if( !config.storage().sasToken && config.batch().poolIdentityClientId )
             return null
         final AzPath azPath = (AzPath) path
         final container = azPath.getContainerName() as String

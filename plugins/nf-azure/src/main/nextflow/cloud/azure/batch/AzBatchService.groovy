@@ -527,13 +527,29 @@ class AzBatchService implements Closeable {
         return null
     }
 
+    protected boolean usePoolManagedIdentityForTaskStorage() {
+        final clientId = config.batch().poolIdentityClientId
+        return clientId != null && !clientId.toString().trim().isEmpty()
+    }
+
+    protected String getPoolManagedIdentityTaskEnv() {
+        if( !usePoolManagedIdentityForTaskStorage() )
+            return ''
+        final clientId = config.batch().poolIdentityClientId
+        String result = '-e AZCOPY_AUTO_LOGIN_TYPE=MSI '
+        if( clientId != 'auto' )
+            result += "-e AZCOPY_MSI_CLIENT_ID=${clientId} "
+        return result
+    }
+
     protected BatchTaskCreateContent createTask(String poolId, String jobId, TaskRun task) {
         assert poolId, 'Missing Azure Batch poolId argument'
         assert jobId, 'Missing Azure Batch jobId argument'
         assert task, 'Missing Azure Batch task argument'
 
         final sas = getSasForPath(task.workDir)
-        if( !sas )
+        final usePoolManagedIdentity = usePoolManagedIdentityForTaskStorage()
+        if( !sas && !usePoolManagedIdentity )
             throw new IllegalArgumentException("Missing Azure Blob storage SAS token")
 
         final container = task.getContainer()
@@ -567,6 +583,9 @@ class AzBatchService implements Closeable {
 
         // Handle Fusion settings
         final fusionEnabled = FusionHelper.isFusionEnabled((Session)Global.session)
+        if( !fusionEnabled && !sas && usePoolManagedIdentity )
+            opts += getPoolManagedIdentityTaskEnv()
+
         String fusionCmd = null
         if( fusionEnabled ) {
             // Create the FusionScriptLauncher from the TaskBean

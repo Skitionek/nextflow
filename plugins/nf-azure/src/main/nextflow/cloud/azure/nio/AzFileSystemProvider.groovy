@@ -241,7 +241,6 @@ class AzFileSystemProvider extends FileSystemProvider {
 
         if( managedIdentityUser || managedIdentitySystem ) {
             client = createBlobServiceWithManagedIdentity(accountName, managedIdentityUser)
-            generateAndRegisterContainerSas(client, bucket, config)
         }
         else if( servicePrincipalSecret && servicePrincipalId && tenantId ) {
             client = createBlobServiceWithServicePrincipal(accountName, servicePrincipalId, servicePrincipalSecret, tenantId)
@@ -267,6 +266,8 @@ class AzFileSystemProvider extends FileSystemProvider {
 
     protected void generateAndRegisterContainerSas(BlobServiceClient serviceClient, String bucket, Map<String,?> config) {
         if( !Global.session?.config )
+            return
+        if( config.get(AZURE_MANAGED_IDENTITY_USER) || config.get(AZURE_MANAGED_IDENTITY_SYSTEM) )
             return
         final azConfig = AzConfig.getConfig()
         if( azConfig.storage().sasToken )

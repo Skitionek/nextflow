@@ -544,4 +544,36 @@ class AzFileCopyStrategyTest extends Specification {
         !env.contains('export AZ_SAS')
     }
 
+    def 'should export azcopy managed identity env vars when pool identity is configured and sas is missing'() {
+        given:
+        def config = new AzConfig([storage:[:], batch:[poolIdentityClientId: 'pool-mi-123']])
+        def strategy = new AzFileCopyStrategy()
+        strategy.config = config
+
+        when:
+        def env = strategy.getEnvScript([:], false)
+
+        then:
+        env.contains('export AZCOPY_AUTO_LOGIN_TYPE="MSI"')
+        env.contains('export AZCOPY_MSI_CLIENT_ID="pool-mi-123"')
+    }
+
+      def 'should not generate sas token when pool managed identity is configured'() {
+        given:
+        GroovyMock(AzHelper, global: true)
+        def config = new AzConfig([storage:[:], batch:[poolIdentityClientId: 'pool-mi-123']])
+        def strategy = new AzFileCopyStrategy()
+        strategy.config = config
+        strategy.azProvider = Mock(AzFileSystemProvider)
+        def path = Mock(AzPath)
+
+        when:
+        def sas = strategy.getSasForPath(path)
+
+        then:
+        sas == null
+        0 * AzHelper.generateContainerSasWithActiveDirectory(_, _)
+        0 * AzHelper.generateContainerSasWithAccountKey(_, _)
+      }
+
 }
