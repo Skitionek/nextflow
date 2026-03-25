@@ -119,6 +119,7 @@ class AzFileSystemProviderTest extends Specification {
         def fs = provider.newFileSystem(uri, env)
         then:
         1 * provider.createBlobServiceWithKey(NAME, KEY) >> storage
+        1 * provider.generateAndRegisterContainerSas(_, _, _) >> null
         fs.containerName == 'bucket-example'
         fs.provider() == provider
         provider.getFileSystem(uri) == fs
@@ -155,6 +156,28 @@ class AzFileSystemProviderTest extends Specification {
         thrown(FileSystemAlreadyExistsException)
     }
 
+    def 'should create a new file system with managed identity without generating sas token'() {
+
+        given:
+        def storage = GroovyMock(BlobServiceClient)
+        def provider = Spy(AzFileSystemProvider)
+        and:
+        def NAME = 'xyz'
+        def CLIENT_ID = 'pool-mi-123'
+        and:
+        def uri = new URI('az://bucket-example/alpha/bravo')
+        def env = [AZURE_STORAGE_ACCOUNT_NAME: NAME, AZURE_MANAGED_IDENTITY_USER: CLIENT_ID]
+
+        when:
+        def fs = provider.newFileSystem(uri, env)
+        then:
+        1 * provider.createBlobServiceWithManagedIdentity(NAME, CLIENT_ID) >> storage
+        0 * provider.generateAndRegisterContainerSas(_, _, _)
+        fs.containerName == 'bucket-example'
+        fs.provider() == provider
+        provider.getFileSystem(uri) == fs
+    }
+
     def 'should create directory' () {
 
         given:
@@ -172,6 +195,7 @@ class AzFileSystemProviderTest extends Specification {
         def fs= provider.newFileSystem0(CONTAINER, config)
         then:
         1 * provider.createBlobServiceWithKey(NAME, KEY) >> storage
+        1 * provider.generateAndRegisterContainerSas(_, _, _) >> null
         1 * provider.createFileSystem(_, CONTAINER, config) >> FS
         and:
         fs == FS

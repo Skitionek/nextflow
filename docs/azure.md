@@ -494,14 +494,12 @@ The `azure.batch.pools.<POOL_NAME>.scaleFormula` setting can be used to specify 
 
 By default, Nextflow creates SAS tokens for specific containers and passes them to tasks to enable file operations with Azure Storage. SAS tokens expire after a set period of time. The expiration time is 48 hours by default and can be configured using `azure.storage.tokenDuration` in your configuration.
 
+When `azure.batch.poolIdentityClientId` is configured and no explicit `azure.storage.sasToken` is provided, Nextflow does not generate SAS tokens for Azure Batch tasks. In this case, tasks authenticate to Azure Storage using the managed identity attached to the Batch pool.
+
 :::{versionadded} 25.05.0-edge
 :::
 
-:::{warning}
-Only available when using [Fusion filesystem](fusion.md)!
-:::
-
-You can also authenticate to Azure Storage using a managed identity when using Fusion.
+You can also authenticate to Azure Storage using a managed identity.
 
 To do this:
 
@@ -517,7 +515,11 @@ azure {
 }
 ```
 
-Each task authenticates as the managed identity, and downloads and uploads files to Azure Storage using these credentials. It is possible to attach more than one managed identity to a pool. Fusion uses the identity specified by `azure.batch.poolIdentityClientId`.
+Each task authenticates as the managed identity and downloads/uploads files to Azure Storage using these credentials. It is possible to attach more than one managed identity to a pool. Nextflow uses the identity specified by `azure.batch.poolIdentityClientId` (or the first available identity if set to `auto`).
+
+:::{note}
+For non-Fusion Azure Batch tasks, this relies on `azcopy` managed identity authentication on the compute nodes.
+:::
 
 ### Task packing
 

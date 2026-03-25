@@ -685,6 +685,7 @@ class AzBatchServiceTest extends Specification {
         then:
         1 * azure.getPoolSpec(POOL_ID) >> SPEC
         1 * azure.computeSlots(TASK, SPEC) >> 4
+        1 * azure.getSasForPath(_) >> SAS
         1 * azure.resourceFileUrls(TASK, SAS) >> []
         1 * azure.outputFileUrls(TASK, SAS) >> []
         and:
@@ -729,6 +730,7 @@ class AzBatchServiceTest extends Specification {
         then:
         1 * azure.getPoolSpec(POOL_ID) >> SPEC
         1 * azure.computeSlots(TASK, SPEC) >> 4
+        1 * azure.getSasForPath(_) >> SAS
         1 * azure.resourceFileUrls(TASK, SAS) >> []
         1 * azure.outputFileUrls(TASK, SAS) >> []
         and:
@@ -774,6 +776,7 @@ class AzBatchServiceTest extends Specification {
         then:
         1 * azure.getPoolSpec(POOL_ID) >> SPEC
         1 * azure.computeSlots(TASK, SPEC) >> 4
+        1 * azure.getSasForPath(_) >> SAS
         1 * azure.resourceFileUrls(TASK, SAS) >> []
         1 * azure.outputFileUrls(TASK, SAS) >> []
         and:
@@ -873,6 +876,38 @@ class AzBatchServiceTest extends Specification {
 
         then:
         env['FUSION_AZ_MSI_CLIENT_ID'] == POOL_IDENTITY_CLIENT_ID
+    }
+
+    def 'should create task for submit with pool managed identity and no sas' () {
+        given:
+        Global.session = Mock(Session) { getConfig()>>[fusion:[enabled:false]] }
+        and:
+        def POOL_ID = 'my-pool'
+        def CONFIG = new AzConfig([batch: [poolIdentityClientId: 'pool-mi-123']])
+        def exec = createExecutor(CONFIG)
+        AzBatchService azure = Spy(new AzBatchService(exec))
+        and:
+        def TASK = Mock(TaskRun) {
+            getHash() >> HashCode.fromInt(3)
+            getContainer() >> 'ubuntu:latest'
+            getConfig() >> Mock(TaskConfig)
+        }
+        and:
+        def SPEC = new AzVmPoolSpec(poolId: POOL_ID, vmType: Mock(AzVmType), opts: new AzPoolOpts([:]))
+
+        when:
+        def result = azure.createTask(POOL_ID, 'salmon', TASK)
+        then:
+        1 * azure.getPoolSpec(POOL_ID) >> SPEC
+        1 * azure.computeSlots(TASK, SPEC) >> 2
+        1 * azure.getSasForPath(_) >> null
+        1 * azure.resourceFileUrls(TASK, null) >> []
+        1 * azure.outputFileUrls(TASK, null) >> []
+        and:
+        result.id == 'nf-03000000'
+        result.requiredSlots == 2
+        result.commandLine == "bash -o pipefail -c 'bash .command.run 2>&1 | tee .command.log'"
+        result.containerSettings.containerRunOptions == '-v /etc/ssl/certs:/etc/ssl/certs:ro -v /etc/pki:/etc/pki:ro -e AZCOPY_AUTO_LOGIN_TYPE=MSI -e AZCOPY_MSI_CLIENT_ID=pool-mi-123 '
     }
 
 
